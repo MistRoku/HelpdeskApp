@@ -1,6 +1,8 @@
 
 namespace HelpdeskAPI;
 
+using HelpdeskAPI.Data;
+
 public class Program
 {
     public static void Main(string[] args)
@@ -12,6 +14,10 @@ public class Program
 
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
+        builder.Ser0vices.AddControllers();
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
+        builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 
         var app = builder.Build();
 
@@ -21,6 +27,27 @@ public class Program
             app.MapOpenApi();
         }
 
+        // CORS for React
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("ReactDevelopment", policy =>
+            {
+                policy.WithOrigins("http://localhost:3000")
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            });
+        });
+
+        var app = builder.Build();
+
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+
+        app.UseCors("ReactDevelopment");
+        app.MapControllers();
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
