@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace HelpdeskAPI.Data;
 
 /// <summary>
-/// EF Core persistence. SQLite for local demo, SQL Server in production.
-/// Active when a connection string is configured; otherwise the app runs
-/// on the in-memory repository so the demo works with zero setup.
+/// EF Core persistence. SQL Server when a connection string is configured;
+/// otherwise the app runs on the in-memory repository so the demo works
+/// with zero setup.
 /// Run: dotnet ef migrations add Initial --project backend/HelpdeskAPI
 /// </summary>
 public class HelpdeskDbContext : DbContext

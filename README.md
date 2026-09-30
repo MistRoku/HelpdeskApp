@@ -3,6 +3,15 @@
 Full-stack helpdesk: ticket intake and workflow, knowledge base, AI triage,
 SLA tracking, CSAT/NPS, canned replies, real-time updates, and role-based access.
 
+## Live demo
+
+- App: `https://helpdeskapp.netlify.app` (placeholder, fill in after first deploy)
+- API: `https://helpdesk-api.onrender.com` (placeholder, fill in after first deploy)
+
+Verify on the live URL before announcing it: register a user, create a
+ticket, assign it as an agent, then confirm the ticket appears in the queue
+and an overdue ticket surfaces in the SLA breached list.
+
 ## Stack
 
 - Backend: ASP.NET Core 10, SignalR, EF Core (SQL Server when configured, in-memory demo otherwise), Dapper-ready data layer
@@ -53,6 +62,9 @@ Demo logins: `admin / Adminpass123`, `agent1 / Agentpass123`, `john.doe / Userpa
 - Public replies plus agent-only internal notes with full conversation history; reopen within 7 days; 14-day idle auto-close worker
 - Search across number, subject, and text; filters by status, priority, category, assignee, date; saved views including My Open Tickets
 - File attachments up to 10 MB with type allowlist and permission-checked download
+  (`POST /api/tickets/{id}/attachments`, `GET /api/tickets/attachments/{id}/download`,
+  `TicketRepository` attachment store, upload UI in `pages/TicketDetail.tsx`;
+  demo-scale local storage, virus scanning noted as a follow-up)
 - Knowledge base with categories, versioning, view counts, helpful votes
 - AI triage: category and priority guess with confidence, daily per-user cap, prompt-injection refusal, KB suggestions before submit (`POST /api/ai/suggest-for-ticket`)
 - SLA policies per priority; 5-minute sweeper flags breaches, warns under 30 minutes, escalates to team lead; breached list and per-ticket status endpoint
@@ -68,9 +80,21 @@ dotnet test backend/HelpdeskAPI.Tests/HelpdeskAPI.Tests.csproj
 cd frontend && npm test -- --watchAll=false
 ```
 
-CI (`.github/workflows/ci.yml`) builds the API, runs xUnit, installs and builds the frontend, and runs its tests.
+CI (`.github/workflows/ci.yml`) builds the API, runs the xUnit suite
+(`WorkflowTests`, `SlaTests`, `SecurityRuleTests`), then installs the
+frontend and runs both test files (`App.test.tsx`, `components/ui.test.tsx`)
+before building it.
 
 ## Deploy
 
-- API: multi-stage `backend/HelpdeskAPI/Dockerfile` (SDK build to ASP.NET runtime). Set `Auth:JwtSecret`, `ConnectionStrings:Helpdesk`, and `Cors:AllowedOrigins` in the environment.
-- Frontend: static build (`npm run build`) to Netlify, Render, or Azure Static Web Apps with `REACT_APP_API_BASE` pointing at the API.
+Deployed surface is Docker plus static hosting. No Azure resources exist, so
+nothing here claims Azure.
+
+- API: multi-stage `backend/HelpdeskAPI/Dockerfile` (SDK build to ASP.NET runtime).
+  `render.yaml` runs it as a Docker web service with a health check on
+  `/api/sla/policies`. Set `HELPDESK_JWT` (32+ chars, required),
+  `ConnectionStrings__Helpdesk` (omit for the in-memory demo), and
+  `Cors__AllowedOrigins__0` (the frontend URL) in the host dashboard.
+- Frontend: `netlify.toml` builds `frontend/` and ships `build/` with an SPA
+  fallback so `/tickets/42` deep links resolve. `render.yaml` also defines a
+  static site alternative. Set `REACT_APP_API_BASE` to the API URL.

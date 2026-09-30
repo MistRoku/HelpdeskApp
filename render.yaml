@@ -1,0 +1,31 @@
+# Render blueprint: API web service (Docker) plus static frontend.
+# Set in the Render dashboard before first deploy:
+#   HELPDESK_JWT (32+ chars, required in production)
+#   ConnectionStrings__Helpdesk (optional SQL Server; omit for in-memory demo)
+#   Cors__AllowedOrigins__0 (the frontend URL below)
+services:
+  - type: web
+    name: helpdesk-api
+    runtime: docker
+    dockerfilePath: ./backend/HelpdeskAPI/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/sla/policies
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: HELPDESK_JWT
+        sync: false
+      - key: Cors__AllowedOrigins__0
+        value: https://helpdeskapp.netlify.app
+
+  - type: web
+    name: helpdesk-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    buildFilter:
+      paths:
+        - frontend/**
+    staticPublishPath: ./frontend/build
+    envVars:
+      - key: REACT_APP_API_BASE
+        value: https://helpdesk-api.onrender.com
