@@ -38,6 +38,8 @@ dotnet run --project backend/HelpdeskAPI
 
 API listens on `https://localhost:7049` (see `Properties/launchSettings.json`).
 Swagger in Development at `/swagger`. SignalR hub at `/hubs/tickets`.
+`HelpdeskAPI.http` has ready-made requests for register, login, ticket
+search and create, dashboard stats, and SLA policies.
 
 Optional persistence: set `ConnectionStrings:Helpdesk` to a SQL Server string and
 run `dotnet ef migrations add Initial --project backend/HelpdeskAPI`. Without it,
@@ -61,11 +63,15 @@ Demo logins: `admin / Adminpass123`, `agent1 / Agentpass123`, `john.doe / Userpa
 - Tickets numbered `TKT-YYYYMMDD-XXXX`; workflow New to Open to InProgress to Pending to Resolved to Closed, enforced in `WorkflowService`
 - Public replies plus agent-only internal notes with full conversation history; reopen within 7 days; 14-day idle auto-close worker
 - Search across number, subject, and text; filters by status, priority, category, assignee, date; saved views including My Open Tickets
-- File attachments up to 10 MB with type allowlist and permission-checked download
+- File attachments up to 10 MB with type allowlist and ownership checks on
+  list, upload, and download
   (`POST /api/tickets/{id}/attachments`, `GET /api/tickets/attachments/{id}/download`,
   `TicketRepository` attachment store, upload UI in `pages/TicketDetail.tsx`;
   demo-scale local storage, virus scanning noted as a follow-up)
-- Knowledge base with categories, versioning, view counts, helpful votes
+- Knowledge base with categories, versioning, view counts, helpful votes.
+  Article create and edit is Agent plus Admin, delete is Admin only.
+- Canned replies are Agent plus Admin to create; typing `//` in a ticket
+  reply filters snippets for one-click insert.
 - AI triage: category and priority guess with confidence, daily per-user cap, prompt-injection refusal, KB suggestions before submit (`POST /api/ai/suggest-for-ticket`)
 - SLA policies per priority; 5-minute sweeper flags breaches, warns under 30 minutes, escalates to team lead; breached list and per-ticket status endpoint
 - CSAT (1-5) and NPS (0-10) surveys with aggregate reporting plus per-category volume

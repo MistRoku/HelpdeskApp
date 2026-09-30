@@ -36,7 +36,6 @@ public class AuthController : ControllerBase
     public record RequestResetRequest(string Email);
     public record ConfirmResetRequest(string Token, string NewPassword);
     public record ChangePasswordRequest(string Username, string NewPassword);
-    public record RoleRequest(string Role);
 
     public static User? FindByName(string username) =>
         _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));

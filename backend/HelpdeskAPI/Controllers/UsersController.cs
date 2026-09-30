@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using HelpdeskAPI.Data;
 using HelpdeskAPI.Services;
-using HelpdeskAPI.Controllers;
 
 namespace HelpdeskAPI.Controllers;
 

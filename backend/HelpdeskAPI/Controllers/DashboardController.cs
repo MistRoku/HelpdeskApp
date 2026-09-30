@@ -22,8 +22,7 @@ public class DashboardController : ControllerBase
     [HttpGet("stats")]
     public async Task<ActionResult> Stats()
     {
-        var me = RequestUserHelper.Current(HttpContext);
-        if (!RequestUserHelper.IsAgentOrAdmin(me) && me.Username == "anonymous") { /* allow demo */ }
+        // Open to all callers; per-ticket endpoints enforce ownership.
         var all = await _tickets.GetAllAsync();
         var byStatus = all.GroupBy(t => t.Status).ToDictionary(g => g.Key, g => g.Count());
         var open = all.Count(t => t.Status == "New" || t.Status == "Open");

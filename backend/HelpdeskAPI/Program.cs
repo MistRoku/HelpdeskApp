@@ -26,7 +26,7 @@ public class Program
         builder.Services.AddHostedService<AutoCloseWorker>();
         builder.Services.AddHostedService<SlaSweeper>();
 
-        // EF Core persistence when configured. SQLite locally, SQL Server in prod.
+        // EF Core persistence when configured. SQL Server in production.
         // Set ConnectionStrings:Helpdesk to activate; otherwise in-memory demo runs.
         var connectionString = builder.Configuration.GetConnectionString("Helpdesk");
         if (!string.IsNullOrWhiteSpace(connectionString))

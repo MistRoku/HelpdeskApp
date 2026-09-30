@@ -1,6 +1,48 @@
-@HelpdeskAPI_HostAddress = http://localhost:5137
+@HelpdeskAPI_HostAddress = https://localhost:7049
 
-GET {{HelpdeskAPI_HostAddress}}/weatherforecast/
+### Register
+POST {{HelpdeskAPI_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "demo.user",
+  "displayName": "Demo User",
+  "email": "demo@example.com",
+  "password": "Demopass1234"
+}
+
+### Login
+POST {{HelpdeskAPI_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "agent1",
+  "password": "Agentpass123"
+}
+
+### List tickets (search and filter)
+GET {{HelpdeskAPI_HostAddress}}/api/tickets?status=Open
+Accept: application/json
+
+### Create ticket (needs X-CSRF-TOKEN from /api/antiforgery/token)
+POST {{HelpdeskAPI_HostAddress}}/api/tickets
+Content-Type: application/json
+X-CSRF-TOKEN: <token>
+
+{
+  "title": "Printer offline on floor 2",
+  "description": "HP printer shows offline since the morning shift",
+  "priority": "Medium",
+  "category": "Hardware",
+  "channel": "Web"
+}
+
+### Dashboard stats
+GET {{HelpdeskAPI_HostAddress}}/api/dashboard/stats
+Accept: application/json
+
+### SLA policies
+GET {{HelpdeskAPI_HostAddress}}/api/sla/policies
 Accept: application/json
 
 ###

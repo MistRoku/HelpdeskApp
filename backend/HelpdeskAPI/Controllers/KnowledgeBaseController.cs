@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using HelpdeskAPI.Data;
+using HelpdeskAPI.Services;
 
 namespace HelpdeskAPI.Controllers;
 
@@ -59,11 +60,11 @@ public class KnowledgeBaseController : ControllerBase
         return Ok();
     }
 
-    private bool IsAgentOrAdmin() =>
-        (User?.IsInRole("Agent") ?? false) || (User?.IsInRole("Admin") ?? false) || Request.Headers.ContainsKey("X-Allow-Write");
+    private RequestUser Me() => RequestUserHelper.Current(HttpContext);
 
-    private bool IsAdmin() =>
-        (User?.IsInRole("Admin") ?? false) || Request.Headers["X-Role"].ToString() == "Admin";
+    private bool IsAgentOrAdmin() => RequestUserHelper.IsAgentOrAdmin(Me());
+
+    private bool IsAdmin() => RequestUserHelper.IsAdmin(Me());
 
     public record FeedbackRequest(bool Helpful);
 }

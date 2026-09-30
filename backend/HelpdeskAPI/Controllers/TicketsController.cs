@@ -61,8 +61,11 @@ public class TicketsController : ControllerBase
     [HttpGet("number/{number}")]
     public async Task<ActionResult<Ticket>> GetByNumber(string number)
     {
+        var me = Me();
         var ticket = await _repository.GetByNumberAsync(number);
-        return ticket == null ? NotFound() : Ok(ticket);
+        if (ticket == null) return NotFound();
+        if (me.Role == "User" && ticket.UserName != me.Username) return Forbid();
+        return Ok(ticket);
     }
 
     [HttpPost]
@@ -249,7 +252,14 @@ public class TicketsController : ControllerBase
 
     // Attachments: 10 MB max, allowlist enforced
     [HttpGet("{id}/attachments")]
-    public async Task<ActionResult> Attachments(int id) => Ok(await _repository.GetAttachmentsAsync(id));
+    public async Task<ActionResult> Attachments(int id)
+    {
+        var me = Me();
+        var ticket = await _repository.GetByIdAsync(id);
+        if (ticket == null) return NotFound();
+        if (me.Role == "User" && ticket.UserName != me.Username) return Forbid();
+        return Ok(await _repository.GetAttachmentsAsync(id));
+    }
 
     [HttpPost("{id}/attachments")]
     [ValidateAntiForgeryToken]
@@ -259,6 +269,7 @@ public class TicketsController : ControllerBase
         var me = Me();
         var ticket = await _repository.GetByIdAsync(id);
         if (ticket == null) return NotFound();
+        if (me.Role == "User" && ticket.UserName != me.Username) return Forbid();
         if (file == null || file.Length == 0) return BadRequest("File is required.");
         if (file.Length > TicketRepository.MaxFileBytes) return BadRequest("File exceeds 10 MB limit.");
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
