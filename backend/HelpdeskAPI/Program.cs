@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using HelpdeskAPI.Data;
 using HelpdeskAPI.Hubs;
+using HelpdeskAPI.Middleware;
 using HelpdeskAPI.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace HelpdeskAPI;
 
@@ -22,6 +24,16 @@ public class Program
         builder.Services.AddSingleton<TokenService>();
         builder.Services.AddSingleton<NotificationService>();
         builder.Services.AddHostedService<AutoCloseWorker>();
+        builder.Services.AddHostedService<SlaSweeper>();
+
+        // EF Core persistence when configured. SQLite locally, SQL Server in prod.
+        // Set ConnectionStrings:Helpdesk to activate; otherwise in-memory demo runs.
+        var connectionString = builder.Configuration.GetConnectionString("Helpdesk");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            builder.Services.AddDbContext<HelpdeskDbContext>(options =>
+                options.UseSqlServer(connectionString));
+        }
 
         builder.Services.AddAntiforgery(options =>
         {
@@ -47,6 +59,18 @@ public class Program
             options.AddFixedWindowLimiter("password-reset", o =>
             {
                 o.PermitLimit = 3;
+                o.Window = TimeSpan.FromHours(1);
+                o.QueueLimit = 0;
+            });
+            options.AddFixedWindowLimiter("auth", o =>
+            {
+                o.PermitLimit = 10;
+                o.Window = TimeSpan.FromMinutes(5);
+                o.QueueLimit = 0;
+            });
+            options.AddFixedWindowLimiter("ticket-create", o =>
+            {
+                o.PermitLimit = 30;
                 o.Window = TimeSpan.FromHours(1);
                 o.QueueLimit = 0;
             });
@@ -80,6 +104,10 @@ public class Program
         });
 
         var app = builder.Build();
+
+        TokenService.ThrowIfDefaultSecretInProduction(builder.Configuration, app.Environment);
+
+        app.UseMiddleware<GlobalExceptionHandler>();
 
         app.Use(async (context, next) =>
         {

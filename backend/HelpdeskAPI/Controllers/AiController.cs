@@ -45,4 +45,33 @@ public class AiController : ControllerBase
         var articles = _store.SearchArticles(clean.Length > 60 ? clean.Substring(0, 60) : clean, null).Take(3).ToList();
         return Ok(articles.Select(a => new { a.Id, a.Title, a.Category }));
     }
+
+    /// <summary>
+    /// Classify then match KB articles in the predicted category so the
+    /// ticket form can show suggestions before submit.
+    /// </summary>
+    [HttpPost("suggest-for-ticket")]
+    public ActionResult SuggestForTicket([FromBody] ClassifyRequest req)
+    {
+        var caller = User?.Identity?.Name ?? Request.Headers["X-User"].ToString();
+        if (string.IsNullOrWhiteSpace(caller)) caller = "anonymous";
+        if (!_ai.TryCheckCap(caller, out var remaining))
+            return StatusCode(429, new { error = "AI daily limit reached. Try again tomorrow.", remaining = 0 });
+
+        var result = _ai.Classify(
+            SanitizerService.Sanitize(req.Subject, 200),
+            SanitizerService.Sanitize(req.Description, 5000), caller);
+        if (result.Blocked)
+            return BadRequest(new { error = "Request refused. Instruction override attempts are blocked.", remaining });
+
+        var articles = _store.SearchArticles(req.Subject, result.Category).Take(3).ToList();
+        return Ok(new
+        {
+            category = result.Category,
+            priority = result.Priority,
+            confidence = result.Confidence,
+            remaining,
+            articles = articles.Select(a => new { a.Id, a.Title, a.Category })
+        });
+    }
 }

@@ -8,18 +8,33 @@ namespace HelpdeskAPI.Services;
 /// <summary>
 /// Minimal JWT style token service using HMAC SHA256. No extra packages required.
 /// Access tokens expire in 15 minutes. Refresh tokens are opaque and last 7 days.
-/// Passwords use PBKDF2 with per user salt.
+/// Passwords use PBKDF2 with per user salt. Tokens carry issuer and audience
+/// with a 60 second clock skew allowance; production refuses to boot on the
+/// default dev secret (see ThrowIfDefaultSecretInProduction).
 /// </summary>
 public class TokenService
 {
     private readonly byte[] _key;
+    private readonly string _issuer;
+    private readonly string _audience;
     private static readonly List<RefreshSession> _refresh = new();
     private static readonly object _lock = new();
+    private static readonly TimeSpan ClockSkew = TimeSpan.FromSeconds(60);
 
     public TokenService(IConfiguration config)
     {
         var secret = config["Auth:JwtSecret"] ?? Environment.GetEnvironmentVariable("HELPDESK_JWT") ?? "dev-secret-change-me-please-rotate-32chars";
         _key = Encoding.UTF8.GetBytes(secret);
+        _issuer = config["Auth:Issuer"] ?? "helpdesk";
+        _audience = config["Auth:Audience"] ?? "helpdesk-web";
+    }
+
+    public static void ThrowIfDefaultSecretInProduction(IConfiguration config, IHostEnvironment env)
+    {
+        if (!env.IsProduction()) return;
+        var secret = config["Auth:JwtSecret"] ?? Environment.GetEnvironmentVariable("HELPDESK_JWT") ?? string.Empty;
+        if (secret.Length < 32 || secret.Contains("change-me"))
+            throw new InvalidOperationException("Auth:JwtSecret must be set to a 32+ char value in production.");
     }
 
     public static string HashPassword(string password)
@@ -48,6 +63,8 @@ public class TokenService
         var header = Base64Url(JsonSerializer.Serialize(new { alg = "HS256", typ = "JWT" }));
         var payload = Base64Url(JsonSerializer.Serialize(new
         {
+            iss = _issuer,
+            aud = _audience,
             sub = user.Username,
             role = user.Role,
             sv = user.SessionVersion,
@@ -94,8 +111,10 @@ public class TokenService
             if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(parts[2]))) return false;
             var json = Encoding.UTF8.GetString(Base64UrlDecode(parts[1]));
             var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.GetProperty("iss").GetString() != _issuer) return false;
+            if (doc.RootElement.GetProperty("aud").GetString() != _audience) return false;
             var exp = doc.RootElement.GetProperty("exp").GetInt64();
-            if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > exp) return false;
+            if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > exp + (long)ClockSkew.TotalSeconds) return false;
             username = doc.RootElement.GetProperty("sub").GetString() ?? string.Empty;
             role = doc.RootElement.GetProperty("role").GetString() ?? string.Empty;
             sessionVersion = doc.RootElement.GetProperty("sv").GetInt32();

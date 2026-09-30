@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using HelpdeskAPI.DTOs;
 using HelpdeskAPI.Models;
 using HelpdeskAPI.Services;
 
@@ -31,8 +32,6 @@ public class AuthController : ControllerBase
         _notifications = notifications;
     }
 
-    public record RegisterRequest(string Username, string DisplayName, string Email, string Password);
-    public record LoginRequest(string Username, string Password);
     public record RefreshRequest(string RefreshToken);
     public record RequestResetRequest(string Email);
     public record ConfirmResetRequest(string Token, string NewPassword);
@@ -46,6 +45,7 @@ public class AuthController : ControllerBase
     private object Shape(User u) => new { u.Id, u.Username, u.DisplayName, u.Email, u.Role, u.EmailVerified, u.CreatedAt };
 
     [HttpPost("register")]
+    [EnableRateLimiting("auth")]
     public ActionResult Register([FromBody] RegisterRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password) || string.IsNullOrWhiteSpace(req.Email))
@@ -70,6 +70,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public ActionResult Login([FromBody] LoginRequest req)
     {
         var user = FindByName(req.Username);

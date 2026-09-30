@@ -1,7 +1,9 @@
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using HelpdeskAPI.Data;
+using HelpdeskAPI.DTOs;
 using HelpdeskAPI.Hubs;
 using HelpdeskAPI.Models;
 using HelpdeskAPI.Services;
@@ -65,11 +67,19 @@ public class TicketsController : ControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<ActionResult<Ticket>> Post(Ticket ticket)
+    [EnableRateLimiting("ticket-create")]
+    public async Task<ActionResult<Ticket>> Post([FromBody] CreateTicketRequest req)
     {
         var me = Me();
-        if (string.IsNullOrWhiteSpace(ticket.Title) || string.IsNullOrWhiteSpace(ticket.Description))
-            return BadRequest("Title and description are required.");
+        var ticket = new Ticket
+        {
+            Title = req.Title,
+            Description = req.Description,
+            Priority = req.Priority,
+            Category = req.Category,
+            Channel = req.Channel,
+            Status = "New",
+        };
         if (me.Username != "anonymous") ticket.UserName = me.Username;
         if (string.IsNullOrWhiteSpace(ticket.UserName)) ticket.UserName = "web-user";
 
@@ -94,16 +104,15 @@ public class TicketsController : ControllerBase
         var created = await _repository.CreateAsync(ticket);
         _notifications.Audit(created.Id, caller, "Created ticket " + created.TicketNumber);
         _notifications.Broadcast("New ticket " + created.TicketNumber, created.Title, created.Id);
-        await _hub.Clients.All.SendAsync("ticketCreated", created.Id, created.TicketNumber);
+        await _hub.Clients.Group(TicketGroups.Agents).SendAsync("ticketCreated", created.Id, created.TicketNumber);
         return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
     [HttpPut("{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Put(int id, Ticket ticket)
+    public async Task<IActionResult> Put(int id, [FromBody] UpdateTicketRequest req)
     {
         var me = Me();
-        if (id != ticket.Id) return BadRequest();
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null) return NotFound();
         if (me.Role == "User" && existing.UserName != me.Username) return Forbid();
@@ -112,11 +121,16 @@ public class TicketsController : ControllerBase
             // Customers may edit title and description of own open tickets only
             if (existing.Status == "Closed" || existing.Status == "Resolved") return Forbid();
         }
-        var updated = await _repository.UpdateAsync(ticket);
+        existing.Title = req.Title;
+        existing.Description = req.Description;
+        existing.Priority = req.Priority;
+        existing.Category = req.Category;
+        existing.AiOverridden = req.AiOverridden;
+        var updated = await _repository.UpdateAsync(existing);
         if (updated)
         {
             _notifications.Audit(id, me.Username, "Updated ticket");
-            await _hub.Clients.Group("ticket-" + id).SendAsync("ticketUpdated", id);
+            await _hub.Clients.Group(TicketGroups.Ticket(id)).SendAsync("ticketUpdated", id);
         }
         return updated ? NoContent() : NotFound();
     }
@@ -158,7 +172,7 @@ public class TicketsController : ControllerBase
         await _repository.UpdateAsync(ticket);
         _notifications.Audit(id, me.Username, "Status to " + req.Status);
         _notifications.Notify(ticket.UserName, "Ticket " + ticket.TicketNumber + " is " + req.Status, "Status changed by " + me.Username, id);
-        await _hub.Clients.Group("ticket-" + id).SendAsync("ticketUpdated", id);
+        await _hub.Clients.Group(TicketGroups.Ticket(id)).SendAsync("ticketUpdated", id);
         return NoContent();
     }
 
@@ -175,7 +189,7 @@ public class TicketsController : ControllerBase
         await _repository.UpdateAsync(ticket);
         _notifications.Notify(req.Assignee, "Assigned ticket " + ticket.TicketNumber, ticket.Title, id);
         _notifications.Audit(id, me.Username, "Assigned to " + req.Assignee);
-        await _hub.Clients.All.SendAsync("ticketAssigned", id, req.Assignee);
+        await _hub.Clients.Group(TicketGroups.Agent(req.Assignee)).SendAsync("ticketAssigned", id, req.Assignee);
         return NoContent();
     }
 
@@ -229,7 +243,7 @@ public class TicketsController : ControllerBase
         });
         var other = ticket.UserName == reply.Author ? (ticket.AssignedTo ?? "agent1") : ticket.UserName;
         _notifications.Notify(other, "New reply on " + ticket.TicketNumber, req.Body.Length > 120 ? req.Body.Substring(0, 120) : req.Body, id);
-        await _hub.Clients.Group("ticket-" + id).SendAsync("replyAdded", id);
+        await _hub.Clients.Group(TicketGroups.Ticket(id)).SendAsync("replyAdded", id);
         return Ok(reply);
     }
 
@@ -291,8 +305,4 @@ public class TicketsController : ControllerBase
             string.Join("\n", all.Select(t => $"\"{t.TicketNumber}\",\"{t.Title.Replace("\"", "\"\"")}\",{t.Status},{t.Priority},{t.Category},{t.AssignedTo},{t.CreatedAt:O}"));
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", "tickets.csv");
     }
-
-    public record StatusRequest(string Status);
-    public record AssignRequest(string Assignee);
-    public record ReplyRequest(string Body, bool IsInternal);
 }

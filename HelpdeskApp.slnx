@@ -1,7 +1,4 @@
 <Solution>
-  <Project Path="helpdeskapp.client/helpdeskapp.client.esproj">
-    <Build />
-    <Deploy />
-  </Project>
-  <Project Path="HelpdeskApp.Server/HelpdeskApp.Server.csproj" />
+  <Project Path="backend/HelpdeskAPI/HelpdeskAPI.csproj" />
+  <Project Path="backend/HelpdeskAPI.Tests/HelpdeskAPI.Tests.csproj" />
 </Solution>

@@ -199,6 +199,21 @@ table.grid th { background: var(--surface-2); color: var(--primary); }
 .sla-breached { color: var(--clay); }
 .sla-ok { color: var(--sage); }
 
+/* Dark mode: same flat system, inverted surfaces. No gradients or shadows. */
+body.dark {
+  --paper: #1C2124;
+  --surface: #242B30;
+  --surface-2: #2E363C;
+  --ink: #EDE9DC;
+  --ink-muted: #B9B4A4;
+  --line: #8A8268;
+  --primary: #D8D0B8;
+  --primary-ink: #1C2124;
+  --bronze: #C9A25E;
+  --clay: #D0805E;
+  --sage: #9DB49E;
+}
+
 @media (max-width: 860px) {
   .shell { flex-direction: column; }
   .sidebar { width: 100%; }
